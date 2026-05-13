@@ -1,5 +1,6 @@
 # +
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"#CPU:-1 GPU:0
 # +
 import pandas as pd
 import numpy as np
@@ -19,6 +20,8 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score, f1_score
 from sklearn.metrics import recall_score, precision_score, accuracy_score
 from sklearn.metrics import confusion_matrix  
 
+import tensorflow as tf
+from tensorflow.keras import layers, models
 
 feats = ['HR_mean','HR_std','meanNN','SDNN','medianNN','meanSD','SDSD','RMSSD','pNN20','pNN50','TINN','LF','HF','ULF','VLF','LFHF',
          'total_power','lfp','hfp','SD1','SD2','pA','pQ','ApEn','shanEn','D2','subject','label']
@@ -87,7 +90,7 @@ def RF_model(X_train, y_train, X_test, y_test):
     AUC = roc_auc_score(y_test, y_pred)
     F1 = f1_score(y_test, y_pred)
     
-    return AUC, F1, accuracy
+    return AUC, F1, accuracy, model.feature_importances_
 
 def AB_model(X_train, y_train, X_test, y_test):
     
@@ -153,46 +156,132 @@ def GB_model(X_train, y_train, X_test, y_test):
     
     return AUC, F1, accuracy
 
+def build_baseline_model():
+    model = models.Sequential([
+        # 使用 Input 層定義 (樣本, 26, 1)
+        layers.Input(shape=(26, 1)),
+        
+        # 第一組：26 -> 13
+        layers.Conv1D(64, kernel_size=3, padding='same', activation='relu'),
+        layers.MaxPooling1D(pool_size=2),
+        
+        # 第二組：13 -> 6
+        layers.Conv1D(128, kernel_size=3, padding='same', activation='relu'),
+        layers.MaxPooling1D(pool_size=2),
+        
+        # 第三組：6 -> 3 (這裡建議停止池化，或者只做卷積)
+        layers.Conv1D(256, kernel_size=3, padding='same', activation='relu'),
+        layers.MaxPooling1D(pool_size=2), 
+        
+        # 第四組：僅卷積，不再池化（避免維度歸零）
+        layers.Conv1D(128, kernel_size=3, padding='same', activation='relu'),
+        
+        # 展平與全連接層
+        layers.Flatten(),
+        layers.Dense(32, activation='relu'),
+        layers.Dense(1, activation='sigmoid')
+    ])
+    return model
 # +
+def cnn1d_model(X_train, y_train, X_test, y_test):
+    model = build_baseline_model()
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    
+    model.fit(X_train, y_train, epochs=100, batch_size=32)
+    predictions = model.predict(X_test)
+    predicted_classes = (predictions > 0.5).astype(int).flatten()
+    accuracy = accuracy_score(y_test, predicted_classes)
+    F1 = f1_score(y_test, predicted_classes)
+    Precision = precision_score(y_test, predicted_classes)
+    Recall = recall_score(y_test, predicted_classes)
+   
+    
+    return accuracy, F1, Precision, Recall
 
+def build_tuned_model():
+    model = models.Sequential(name="Tuned_1D_CNN")
+    # Layer 1 & 2
+    model.add(layers.Conv1D(32, kernel_size=1, strides=1, padding='valid', activation='relu', input_shape=(5, 1)))
+    model.add(layers.MaxPooling1D(pool_size=1, padding='valid')) # Size 1 不會改變長度
+    
+    # Layer 3 & 4
+    model.add(layers.Conv1D(64, kernel_size=1, strides=1, padding='valid', activation='relu'))
+    model.add(layers.MaxPooling1D(pool_size=1, padding='valid'))
+    
+    # Layer 5 & 6
+    model.add(layers.Conv1D(128, kernel_size=1, strides=1, padding='valid', activation='relu'))
+    model.add(layers.MaxPooling1D(pool_size=1, padding='valid'))
+    
+    # Layer 7 & 8
+    model.add(layers.Conv1D(64, kernel_size=1, strides=1, padding='valid', activation='relu'))
+    model.add(layers.MaxPooling1D(pool_size=2, padding='valid')) # 這裡開始縮減
+    
+    # Layer 9, 10, 11
+    model.add(layers.Flatten())
+    model.add(layers.Dense(32, activation='relu'))
+    model.add(layers.Dense(1, activation='sigmoid'))
+    
+    return model
+
+def tuned_cnn1d_model(X_train, y_train, X_test, y_test):
+    model = build_tuned_model()
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    feature=[0, 2, 4, 8, 9]
+    X_train=X_train[:,feature]
+    X_test=X_test[:,feature]
+    X_train = X_train.reshape(-1, 5, 1)
+    X_test = X_test.reshape(-1, 5, 1)
+    model.fit(X_train, y_train, epochs=100, batch_size=32)
+    predictions = model.predict(X_test)
+    predicted_classes = (predictions > 0.5).astype(int).flatten()
+    accuracy = accuracy_score(y_test, predicted_classes)
+    F1 = f1_score(y_test, predicted_classes)
+    Precision = precision_score(y_test, predicted_classes)
+    Recall = recall_score(y_test, predicted_classes)
+   
+    
+    return accuracy, F1, Precision, Recall
 for n in NOISE:
     
 
-    path = '27_features_ppg_test/bi/ens/3/data_merged_' + n + '.csv'
-    result_path_all = 'result/bi/ens/3/all_features_' + n + '.csv'
-    result_path_all = 'bb.csv'
-
+    path = '27_features_ppg_test_2/data_merged_' + n + '.csv'
+    result_path_all = 'result_binary.csv'
+    
     DT_AUC, DT_F1, DT_ACC = [], [], []
-    RF_AUC, RF_F1, RF_ACC = [], [], []
+    RF_AUC, RF_F1, RF_ACC, RF_importances = [], [], [], []
     AB_AUC, AB_F1, AB_ACC = [], [], []
     KN_AUC, KN_F1, KN_ACC = [], [], []
     LDA_AUC, LDA_F1, LDA_ACC = [], [], []
     SVM_AUC, SVM_F1, SVM_ACC = [], [], []
     GB_AUC, GB_F1, GB_ACC = [], [], []
-
+    CNN_ACC, CNN_F1, CNN_Precision, CNN_Recall = [], [], [], []
+    TCNN_ACC, TCNN_F1, TCNN_Precision, TCNN_Recall = [], [], [], []
     for sub in subjects:
     
         df, X_train, y_train, X_test, y_test = read_csv(path, feats, sub)
         df.fillna(0)
+        
         # Normalization
         sc = StandardScaler()  
         X_train = sc.fit_transform(X_train)  
         X_test = sc.transform(X_test)  
     
         auc_dt, f1_dt, acc_dt = DT_model(X_train, y_train, X_test, y_test)
-        auc_rf, f1_rf, acc_rf = RF_model(X_train, y_train, X_test, y_test)
+        auc_rf, f1_rf, acc_rf, importances_rf = RF_model(X_train, y_train, X_test, y_test)
         auc_ab, f1_ab, acc_ab = AB_model(X_train, y_train, X_test, y_test)
         auc_kn, f1_kn, acc_kn = KN_model(X_train, y_train, X_test, y_test)
         auc_lda, f1_lda, acc_lda = LDA_model(X_train, y_train, X_test, y_test)
         auc_svm, f1_svm, acc_svm = SVM_model(X_train, y_train, X_test, y_test)
         auc_gb, f1_gb, acc_gb = GB_model(X_train, y_train, X_test, y_test)
-
+        acc_cnn, f1_cnn, precision_cnn, recall_cnn = cnn1d_model(X_train, y_train, X_test, y_test)
+        acc_tcnn, f1_tcnn, precision_tcnn, recall_tcnn = tuned_cnn1d_model(X_train, y_train, X_test, y_test)
         DT_AUC.append(auc_dt)
         DT_F1.append(f1_dt)
         DT_ACC.append(acc_dt)
         RF_AUC.append(auc_rf)
         RF_F1.append(f1_rf)
         RF_ACC.append(acc_rf)
+        RF_importances.append(importances_rf)
         AB_AUC.append(auc_ab)
         AB_F1.append(f1_ab)
         AB_ACC.append(acc_ab)
@@ -208,7 +297,14 @@ for n in NOISE:
         GB_AUC.append(auc_gb)
         GB_F1.append(f1_gb)
         GB_ACC.append(acc_gb)
-
+        CNN_ACC.append(acc_cnn)
+        CNN_F1.append(f1_cnn)
+        CNN_Precision.append(precision_cnn)
+        CNN_Recall.append(recall_cnn)
+        TCNN_ACC.append(acc_tcnn)
+        TCNN_F1.append(f1_tcnn)
+        TCNN_Precision.append(precision_tcnn)
+        TCNN_Recall.append(recall_tcnn)
     with open(result_path_all, 'w', newline='') as file:
         writer = csv.writer(file)
 
@@ -234,9 +330,22 @@ for n in NOISE:
         writer.writerow(['LDA_ACC'] + LDA_ACC + [np.mean(LDA_ACC)])
         writer.writerow(['SVM_ACC'] + SVM_ACC + [np.mean(SVM_ACC)])
         writer.writerow(['GB_ACC'] + GB_ACC + [np.mean(GB_ACC)])
-
+        writer.writerow(['CNN_ACC'] + CNN_ACC + [np.mean(CNN_ACC)])
+        writer.writerow(['CNN_F1'] + CNN_F1 + [np.mean(CNN_F1)])
+        writer.writerow(['CNN_Precision'] + CNN_Precision + [np.mean(CNN_Precision)])
+        writer.writerow(['CNN_Recall'] + CNN_Recall + [np.mean(CNN_Recall)])
+        writer.writerow(['TCNN_ACC'] + TCNN_ACC + [np.mean(TCNN_ACC)])
+        writer.writerow(['TCNN_F1'] + TCNN_F1 + [np.mean(TCNN_F1)])
+        writer.writerow(['TCNN_Precision'] + TCNN_Precision + [np.mean(TCNN_Precision)])
+        writer.writerow(['TCNN_Recall'] + TCNN_Recall + [np.mean(TCNN_Recall)])
         file.close()
- 
+    mean_importances = np.mean(RF_importances, axis=0)
+    importance_df = pd.DataFrame({
+    'Feature': ["HR_mean", "HR_std", "meanNN", "SDNN", "medianNN", "meanSD", "SDSD", "RMSSD", "pNN20", "pNN50", "TINN", "LF", "HF", "ULF", "VLF", "LFHF", "total_power", "lfp", "hfp", "SD1", "SD2", "pA", "pQ", "ApEn", "shanEn", "D2"],
+    'Importance': mean_importances
+    }).sort_values(by='Importance', ascending=False)
+    print("Feature Importances (Random Forest):")
+    print(importance_df)
     print("DONE: ",n)
 # -
 # #### 

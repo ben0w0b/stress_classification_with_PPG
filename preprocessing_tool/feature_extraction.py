@@ -3,7 +3,7 @@
 
 # +
 import sys
-sys.path.append("/home/sheo1/stress_classification_with_PPG/preprocessing_tool/") 
+sys.path.append("preprocessing_tool") 
 
 from noise_reduction import *
 from peak_detection import *
@@ -109,10 +109,10 @@ def get_window_stats_original(ppg_seg, window_length, label=-1):  # Nan을 제�
     Y = Y[range(int(datalen/2))]
     psd = np.power(Y, 2)  # power spectral density
 
-    lf = np.trapz(abs(psd[(frq >= 0.04) & (frq <= 0.15)])) #Slice frequency spectrum where x is between 0.04 and 0.15Hz (LF), and use NumPy's trapezoidal integration function to find the are
-    hf = np.trapz(abs(psd[(frq > 0.15) & (frq <= 0.5)])) #Do the same for 0.16-0.5Hz (HF)
-    ulf = np.trapz(abs(psd[frq < 0.003]))
-    vlf = np.trapz(abs(psd[(frq >= 0.003) & (frq < 0.04)]))
+    lf = np.trapezoid(abs(psd[(frq >= 0.04) & (frq <= 0.15)])) #Slice frequency spectrum where x is between 0.04 and 0.15Hz (LF), and use NumPy's trapezoidal integration function to find the are
+    hf = np.trapezoid(abs(psd[(frq > 0.15) & (frq <= 0.5)])) #Do the same for 0.16-0.5Hz (HF)
+    ulf = np.trapezoid(abs(psd[frq < 0.003]))
+    vlf = np.trapezoid(abs(psd[(frq >= 0.003) & (frq < 0.04)]))
     
     if hf != 0:
         lfhf = lf/hf
@@ -246,10 +246,10 @@ def calc_fd_hrv(RR_list):
     Y = Y[range(int(datalen/2))]
     psd = np.power(Y, 2)  # power spectral density
 
-    lf = np.trapz(abs(psd[(frq >= 0.04) & (frq <= 0.15)])) #Slice frequency spectrum where x is between 0.04 and 0.15Hz (LF), and use NumPy's trapezoidal integration function to find the are
-    hf = np.trapz(abs(psd[(frq > 0.15) & (frq <= 0.5)])) #Do the same for 0.16-0.5Hz (HF)
-    ulf = np.trapz(abs(psd[frq < 0.003]))
-    vlf = np.trapz(abs(psd[(frq >= 0.003) & (frq < 0.04)]))
+    lf = np.trapezoid(abs(psd[(frq >= 0.04) & (frq <= 0.15)])) #Slice frequency spectrum where x is between 0.04 and 0.15Hz (LF), and use NumPy's trapezoidal integration function to find the are
+    hf = np.trapezoid(abs(psd[(frq > 0.15) & (frq <= 0.5)])) #Do the same for 0.16-0.5Hz (HF)
+    ulf = np.trapezoid(abs(psd[frq < 0.003]))
+    vlf = np.trapezoid(abs(psd[(frq >= 0.003) & (frq < 0.04)]))
     
     if hf != 0:
         lfhf = lf/hf

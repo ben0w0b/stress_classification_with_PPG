@@ -12,7 +12,7 @@ from preprocessing_tool.feature_extraction import *
 WINDOW_IN_SECONDS = 120  # 120 / 180 / 300
 
 NOISE = ['bp_time_ens']
-main_path='/home/sheo1/stress_classification_with_PPG/WESAD/'
+main_path='WESAD'
 
 # +
 # E4 (wrist) Sampling Frequencies
@@ -75,7 +75,7 @@ def extract_ppg_data(e4_data_dict, labels, norm_type=None):
 
     df = df.join(label_df, how='outer')
     
-    df['label'] = df['label'].fillna(method='bfill')
+    df['label'] = df['label'].bfill()
     
     df.reset_index(drop=True, inplace=True)
     
@@ -144,7 +144,7 @@ def make_patient_data(subject_id,ma_usage):
     cycle = 15
     
     # Make subject data object for Sx
-    subject = SubjectData(main_path=main_path', subject_number=subject_id)
+    subject = SubjectData(main_path=main_path, subject_number=subject_id)
     
     # Empatica E4 data
     e4_data_dict = subject.get_wrist_data()
@@ -221,7 +221,7 @@ def combine_files(subjects):
 
     df = pd.concat(df_list)
 
-    df['label'] = (df['0'].astype(str) + df['1'].astype(str) + df['2'].astype(str)).apply(lambda x: x.index('1'))  # 1인 부분의 인덱스 반환
+    df['label'] = np.argmax(df[['0', '1', '2']].values, axis=1)  # 1인 부분의 인덱스 반환
     df.drop(['0', '1', '2'], axis=1, inplace=True)
 
     df.reset_index(drop=True, inplace=True)
@@ -240,7 +240,7 @@ BP, FREQ, TIME, ENSEMBLE = False, False, False, False
 subject_ids = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17]
 
 feat_names = None
-savePath = '27_features_ppg_test_3/LMM/'
+savePath = '27_features_ppg_test_3'
 
 if not os.path.exists(savePath):
     os.makedirs(savePath)

@@ -2,7 +2,7 @@
 # +
 import math
 from scipy import signal
-from scipy import fft, ifft
+from scipy import fft
 from scipy import fftpack
 from scipy.stats import kurtosis, skew
 from scipy.signal import butter, lfilter

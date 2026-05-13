@@ -236,9 +236,10 @@ def GB_model(X_train, y_train, X_test, y_test):
 for n in NOISE:
 
 
-    path = '27_features_ppg_test_3/LMM/data_merged_' + n + WINDOW_SIZE + '.csv'
-    result_path_all = 'result_3/LMM/all_features_' + n + WINDOW_SIZE + '.csv'
+    path = '27_features_ppg_test_3/data_merged_' + n + WINDOW_SIZE + '.csv'
+    result_path_all = 'result_tri.csv'
 
+   
     DT_AUC, DT_F1, DT_ACC = [], [], []
     RF_AUC, RF_F1, RF_ACC = [], [], []
     AB_AUC, AB_F1, AB_ACC = [], [], []
